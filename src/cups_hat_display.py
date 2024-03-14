@@ -430,5 +430,5 @@ if __name__ == '__main__':
     except SystemExit:
         #TODO: Replace or remove this SystemExit processing later.
         #NOTE: SystemExit is the exception result of calling exit()
-        print("Byeeee")
+        print("Byeee")
         cups_hat.display_shutdown()
