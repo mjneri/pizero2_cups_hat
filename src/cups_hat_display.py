@@ -92,9 +92,10 @@ class CUPS_Hat:
 
         # Initialize the IOs
         io.setmode(io.BCM)
-        io.setup(self.led_green, io.OUT)
-        io.setup(self.led_orange, io.OUT)
-        io.setup(self.led_red, io.OUT)
+        io.setup(self.led_green, io.OUT, initial=io.LOW)
+        io.setup(self.led_orange, io.OUT, initial=io.LOW)
+        io.setup(self.led_red, io.OUT, initial=io.LOW)
+        self.led_state = 0      # For use with toggling LEDs
 
         # Reference for code below is from link: https://raspberrypihq.com/use-a-push-button-with-raspberry-pi-gpio/
         # Enable internal pull ups
@@ -148,13 +149,22 @@ class CUPS_Hat:
         self.text_draw_handle = ImageDraw.Draw(self.text_framebuffer)
         """ ENDOF OLED Initialization """
 
-
+        """ Task tick rate attributes """
         # TODO: Add Attributes for tick rates here.
-        self.start_time = 0
-        self.current_time = 0
+        self.start_time_heartbeat = self.millis()
+        self.current_time_heartbeat = self.millis()   # TODO: delete attribute if unused.
         self.flag_tick_heartbeat = False
+
+        self.start_time_oled_update = self.millis()
+        self.current_time_oled_update = self.millis()
         self.flag_tick_oled_update = False
+
+        # Tick rates
+        self.tick_rate_oled_update = 100        # Refresh rate - 10Hz
+        self.tick_rate_heartbeat = 250          # Blink LED every 250ms
+        """ ENDOF Task tick rate attributes """
         
+        """ Asset attributes """
         # Load default font
         self.img_font = ImageFont.truetype("fonts/PixelOperator.ttf", size=16)
 
@@ -193,6 +203,7 @@ class CUPS_Hat:
             "System\nInfo"
         ]
     
+        """ ENDOF Asset attributes """
 
     def display_startup(self):
         """
@@ -320,6 +331,8 @@ class CUPS_Hat:
         """
         Periodically blink the heartbeat LED.
         """
+        io.output(self.led_green, self.led_state)
+        self.led_state = self.led_state ^ 1
 
     def millis(self) -> int:
         """
@@ -329,10 +342,18 @@ class CUPS_Hat:
         # Multiply by 1000 to get time in ms.
         return round(time.time() * 1000)
 
+    # TODO: Complete this function
+    def app_cleanup(self):
+        """
+        Function is called before shutting down or exiting the app
+        """
+
     # TODO: Define all task methods with "task_" before the name
     # Refer to Task State Diagram in OneNote
     def task_oled_update(self):
-        self.oled_update()
+        if self.flag_tick_oled_update is True:
+            self.flag_tick_oled_update = False
+            self.oled_update()
 
     def task_oled_prepare_framebuffer(self):
         """
@@ -400,7 +421,26 @@ class CUPS_Hat:
         Task that updates flag variables
         to represent the tick rate for other tasks.
         """
-        # if self.millis() - self.tick_init
+        # Heartbeat
+        self.current_time_heartbeat = self.millis()
+        if self.current_time_heartbeat - self.start_time_heartbeat >= self.tick_rate_heartbeat:
+            self.flag_tick_heartbeat = True
+            self.start_time_heartbeat = self.millis()
+        
+        # OLED Update
+        self.current_time_oled_update = self.millis()
+        if self.current_time_oled_update - self.start_time_oled_update >= self.tick_rate_oled_update:
+            self.flag_tick_oled_update = True
+            self.start_time_oled_update = self.millis()
+
+    def task_led_status(self):
+        """
+        Task that updates the LEDs/Neopixels to indicate system status
+        """
+        if self.flag_tick_heartbeat is True:
+            self.flag_tick_heartbeat = False
+            self.heartbeat()
+
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Main Application
@@ -418,7 +458,8 @@ def main():
         cups_hat.task_check_inputs()
         cups_hat.task_oled_prepare_framebuffer()
         cups_hat.task_oled_update()
-
+        cups_hat.task_tick_updater()
+        cups_hat.task_led_status()
 
 
 
