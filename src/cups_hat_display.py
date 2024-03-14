@@ -290,7 +290,7 @@ class CUPS_Hat:
             case self.asset_indx.ASSET_ICON_REBOOT:
                 #os("reboot")
                 print("REBOOT!")
-                exit()
+                os.system("vcgencmd measure_temp")
             case self.asset_indx.ASSET_ICON_PRINTER:
                 # Print Test page...
                 #os("lp -d WiFi_HP_Ink_Tank_115 /usr/share/cups/data/testprint")
@@ -334,8 +334,6 @@ class CUPS_Hat:
     def task_oled_update(self):
         self.oled_update()
 
-    # TODO: Display different text depending on whether is_command_executed returned true.
-    # Ex: if user selects Print Test Page, it should display "Printing test page..." for a few seconds...
     def task_oled_prepare_framebuffer(self):
         """
         Paste Icons and text box to the frame buffer
@@ -344,17 +342,20 @@ class CUPS_Hat:
         # Empty the framebuffers first.
         self.framebuffer_clear()
 
-        # TODO: Change POSITION depending on whether there is a \n in the string.
         # Prepare contents of the text box first.
+        # TODO: Display different text depending on whether is_command_executed returned true.
+        # Ex: if user selects Print Test Page, it should display "Printing test page..." for a few seconds...
         self.text_draw_handle.text(self.POS_OLED_TEXT_BOX_LINE1, self.menu_item_names_list[self.current_menu], font=self.img_font, fill=255, spacing=-2)
 
         # Prepare the Icon
-        self.img_framebuffer.paste(self.asset_list[self.current_menu], self.POS_OLED_ICON)
+        if self.is_button_pressed(self.btn_enter) == True:
+            self.img_framebuffer.paste(self.invert_asset_list[self.current_menu], self.POS_OLED_ICON)
+        else:    
+            self.img_framebuffer.paste(self.asset_list[self.current_menu], self.POS_OLED_ICON)
 
         # Paste text box to the main frame buffer.
         self.img_framebuffer.paste(self.text_framebuffer, self.POS_OLED_TEXT_BOX)
 
-        # TODO: Paste inverted or non-inverted navigation icons depending on button press status.
         if self.is_button_pressed(self.btn_left) == True:
             self.img_framebuffer.paste(self.invert_navi_asset_list[self.asset_indx.ASSET_NAVI_LEFT], self.POS_OLED_NAVI_LEFT)
         else:
