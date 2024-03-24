@@ -57,17 +57,15 @@ class CUPS_Hat:
     POS_OLED_TEXT_BOX_LINE1 = (3, -2)
     POS_OLED_TEXT_BOX_LINE2 = (3, 9)
 
-    # Define something...
-    # TODO: FINISH THIS ENUM DEFINITION
-    class asset_indx(enum.IntEnum):
-        ASSET_ICON_REBOOT        = 0
-        ASSET_ICON_PRINTER       = 1
-        ASSET_ICON_POWER         = 2
-        ASSET_ICON_PRINTER_INFO  = 3
-        ASSET_ICON_INFO          = 4
+    # Define asset index constants
+    ASSET_ICON_REBOOT        = 0
+    ASSET_ICON_PRINTER       = 1
+    ASSET_ICON_POWER         = 2
+    ASSET_ICON_PRINTER_INFO  = 3
+    ASSET_ICON_INFO          = 4
 
-        ASSET_NAVI_RIGHT        = 0
-        ASSET_NAVI_LEFT         = 1
+    ASSET_NAVI_RIGHT        = 0
+    ASSET_NAVI_LEFT         = 1
 
     def __init__(self):
         """
@@ -75,7 +73,7 @@ class CUPS_Hat:
         """
         #TODO: Initialize some of the attributes below straight from shell commands instead of 0 at first.
         self.is_idle = False        # Bool that indicates whether the system is idle
-        self.current_menu = self.asset_indx.ASSET_ICON_PRINTER_INFO     # Default menu at startup.
+        self.current_menu = self.ASSET_ICON_PRINTER_INFO     # Default menu at startup.
         self.printer_status = 0     # 0 is ok, -1 not ok.
         self.sys_ip_address = 0
         self.sys_temperature = 0
@@ -148,21 +146,6 @@ class CUPS_Hat:
         self.text_framebuffer = Image.new("1", (self.OLED_TEXT_BOX_WIDTH, self.OLED_TEXT_BOX_HEIGHT))
         self.text_draw_handle = ImageDraw.Draw(self.text_framebuffer)
         """ ENDOF OLED Initialization """
-
-        """ Task tick rate attributes """
-        # TODO: Add Attributes for tick rates here.
-        self.start_time_heartbeat = self.millis()
-        self.current_time_heartbeat = self.millis()   # TODO: delete attribute if unused.
-        self.flag_tick_heartbeat = False
-
-        self.start_time_oled_update = self.millis()
-        self.current_time_oled_update = self.millis()
-        self.flag_tick_oled_update = False
-
-        # Tick rates
-        self.tick_rate_oled_update = 100        # Refresh rate - 10Hz
-        self.tick_rate_heartbeat = 250          # Blink LED every 250ms
-        """ ENDOF Task tick rate attributes """
         
         """ Asset attributes """
         # Load default font
@@ -178,11 +161,11 @@ class CUPS_Hat:
         ]
 
         self.invert_asset_list = [
-            ImageOps.invert(self.asset_list[self.asset_indx.ASSET_ICON_REBOOT]),
-            ImageOps.invert(self.asset_list[self.asset_indx.ASSET_ICON_PRINTER]),
-            ImageOps.invert(self.asset_list[self.asset_indx.ASSET_ICON_POWER]),
-            ImageOps.invert(self.asset_list[self.asset_indx.ASSET_ICON_PRINTER_INFO]),
-            ImageOps.invert(self.asset_list[self.asset_indx.ASSET_ICON_INFO])
+            ImageOps.invert(self.asset_list[self.ASSET_ICON_REBOOT]),
+            ImageOps.invert(self.asset_list[self.ASSET_ICON_PRINTER]),
+            ImageOps.invert(self.asset_list[self.ASSET_ICON_POWER]),
+            ImageOps.invert(self.asset_list[self.ASSET_ICON_PRINTER_INFO]),
+            ImageOps.invert(self.asset_list[self.ASSET_ICON_INFO])
         ]
 
         self.navi_asset_list = [
@@ -191,8 +174,8 @@ class CUPS_Hat:
         ]
 
         self.invert_navi_asset_list = [
-            ImageOps.invert(self.navi_asset_list[self.asset_indx.ASSET_NAVI_RIGHT]),
-            ImageOps.invert(self.navi_asset_list[self.asset_indx.ASSET_NAVI_LEFT])
+            ImageOps.invert(self.navi_asset_list[self.ASSET_NAVI_RIGHT]),
+            ImageOps.invert(self.navi_asset_list[self.ASSET_NAVI_LEFT])
         ]
 
         self.menu_item_names_list = [
@@ -213,7 +196,7 @@ class CUPS_Hat:
         self.framebuffer_clear()
         self.text_draw_handle.text(self.POS_OLED_TEXT_BOX_LINE1, "Welcome!\nStartup!", font=self.img_font, fill=255, spacing=-2)
 
-        self.img_framebuffer.paste(self.asset_list[self.asset_indx.ASSET_ICON_PRINTER], self.POS_OLED_ICON)
+        self.img_framebuffer.paste(self.asset_list[self.ASSET_ICON_PRINTER], self.POS_OLED_ICON)
         self.img_framebuffer.paste(self.text_framebuffer, self.POS_OLED_TEXT_BOX)
 
         self.oled_update()
@@ -238,7 +221,7 @@ class CUPS_Hat:
         self.framebuffer_clear()
         self.text_draw_handle.text(self.POS_OLED_TEXT_BOX_LINE1, "Goodbye!\nShutdown!", font=self.img_font, fill=255, spacing=-2)
 
-        self.img_framebuffer.paste(self.asset_list[self.asset_indx.ASSET_ICON_POWER], self.POS_OLED_ICON)
+        self.img_framebuffer.paste(self.asset_list[self.ASSET_ICON_POWER], self.POS_OLED_ICON)
         self.img_framebuffer.paste(self.text_framebuffer, self.POS_OLED_TEXT_BOX)
 
         self.oled_update()
@@ -284,6 +267,17 @@ class CUPS_Hat:
         button == self.btn_left, etc.
         """
 
+    # TODO: Improve the comment below.
+    def is_button_ev_det(self, button) -> bool:
+        """
+        Check if button event was detected
+        button == self.btn_left, etc.
+        """
+        if io.event_detected(button):
+            return True
+        else:
+            return False
+
     def is_command_executed(self) -> bool:
         """
         Sticky bit - returns true only on first call.
@@ -298,24 +292,24 @@ class CUPS_Hat:
         Run a command based on the current menu.
         """
         match self.current_menu:
-            case self.asset_indx.ASSET_ICON_REBOOT:
+            case self.ASSET_ICON_REBOOT:
                 #os("reboot")
                 print("REBOOT!")
                 os.system("vcgencmd measure_temp")
-            case self.asset_indx.ASSET_ICON_PRINTER:
+            case self.ASSET_ICON_PRINTER:
                 # Print Test page...
                 #os("lp -d WiFi_HP_Ink_Tank_115 /usr/share/cups/data/testprint")
                 print("TEST PRINT")
-            case self.asset_indx.ASSET_ICON_POWER:
+            case self.ASSET_ICON_POWER:
                 # Shutdown...
                 #os("poweroff")
                 print("POWEROFF!")
                 exit()
-            case self.asset_indx.ASSET_ICON_PRINTER_INFO:
+            case self.ASSET_ICON_PRINTER_INFO:
                 # Get printer info using shell commands...
                 print("PRINTER INFO!")
                 pass
-            case self.asset_indx.ASSET_ICON_INFO:
+            case self.ASSET_ICON_INFO:
                 # Get other info (ip address, temp etc)
                 print("SYSTEM INFO!")
                 pass
@@ -334,143 +328,6 @@ class CUPS_Hat:
         io.output(self.led_green, self.led_state)
         self.led_state = self.led_state ^ 1
 
-    def millis(self) -> int:
-        """
-        Non-blocking timer-check function.
-        Similar to millis() in Arduino
-        """
-        # Multiply by 1000 to get time in ms.
-        return round(time.time() * 1000)
+    
 
-    # TODO: Complete this function
-    def app_cleanup(self):
-        """
-        Function is called before shutting down or exiting the app
-        """
-
-    # TODO: Define all task methods with "task_" before the name
-    # Refer to Task State Diagram in OneNote
-    def task_oled_update(self):
-        if self.flag_tick_oled_update is True:
-            self.flag_tick_oled_update = False
-            self.oled_update()
-
-    def task_oled_prepare_framebuffer(self):
-        """
-        Paste Icons and text box to the frame buffer
-        depending on the current menu selected.
-        """
-        # Empty the framebuffers first.
-        self.framebuffer_clear()
-
-        # Prepare contents of the text box first.
-        # TODO: Display different text depending on whether is_command_executed returned true.
-        # Ex: if user selects Print Test Page, it should display "Printing test page..." for a few seconds...
-        self.text_draw_handle.text(self.POS_OLED_TEXT_BOX_LINE1, self.menu_item_names_list[self.current_menu], font=self.img_font, fill=255, spacing=-2)
-
-        # Prepare the Icon
-        if self.is_button_pressed(self.btn_enter) == True:
-            self.img_framebuffer.paste(self.invert_asset_list[self.current_menu], self.POS_OLED_ICON)
-        else:    
-            self.img_framebuffer.paste(self.asset_list[self.current_menu], self.POS_OLED_ICON)
-
-        # Paste text box to the main frame buffer.
-        self.img_framebuffer.paste(self.text_framebuffer, self.POS_OLED_TEXT_BOX)
-
-        if self.is_button_pressed(self.btn_left) == True:
-            self.img_framebuffer.paste(self.invert_navi_asset_list[self.asset_indx.ASSET_NAVI_LEFT], self.POS_OLED_NAVI_LEFT)
-        else:
-            self.img_framebuffer.paste(self.navi_asset_list[self.asset_indx.ASSET_NAVI_LEFT], self.POS_OLED_NAVI_LEFT)
-
-        if self.is_button_pressed(self.btn_right) == True:
-            self.img_framebuffer.paste(self.invert_navi_asset_list[self.asset_indx.ASSET_NAVI_RIGHT], self.POS_OLED_NAVI_RIGHT)
-        else:
-            self.img_framebuffer.paste(self.navi_asset_list[self.asset_indx.ASSET_NAVI_RIGHT], self.POS_OLED_NAVI_RIGHT)
-
-
-    def task_check_inputs(self):
-        """
-        Non-blocking task that checks button inputs and updates current menu and other attributes
-        """
-        # Check LEFT button
-        if io.event_detected(self.btn_left):
-            if self.current_menu == self.asset_indx.ASSET_ICON_REBOOT:
-                self.current_menu = self.asset_indx.ASSET_ICON_INFO
-            else:
-                self.current_menu = self.current_menu - 1
-        else:
-            pass
-
-        # Check RIGHT button
-        if io.event_detected(self.btn_right):
-            if self.current_menu == self.asset_indx.ASSET_ICON_INFO:
-                self.current_menu = self.asset_indx.ASSET_ICON_REBOOT
-            else:
-                self.current_menu = self.current_menu + 1
-        else:
-            pass
-
-        # Check ENTER button
-        if io.event_detected(self.btn_enter):
-            self.run_command()
-        else:
-            pass
-
-    def task_tick_updater(self):
-        """
-        Task that updates flag variables
-        to represent the tick rate for other tasks.
-        """
-        # Heartbeat
-        self.current_time_heartbeat = self.millis()
-        if self.current_time_heartbeat - self.start_time_heartbeat >= self.tick_rate_heartbeat:
-            self.flag_tick_heartbeat = True
-            self.start_time_heartbeat = self.millis()
-        
-        # OLED Update
-        self.current_time_oled_update = self.millis()
-        if self.current_time_oled_update - self.start_time_oled_update >= self.tick_rate_oled_update:
-            self.flag_tick_oled_update = True
-            self.start_time_oled_update = self.millis()
-
-    def task_led_status(self):
-        """
-        Task that updates the LEDs/Neopixels to indicate system status
-        """
-        if self.flag_tick_heartbeat is True:
-            self.flag_tick_heartbeat = False
-            self.heartbeat()
-
-
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# Main Application
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-# Define the Class instance as a global variable to allow methods to be called during Keyboard Interrupts
-cups_hat = CUPS_Hat()
-
-def main():
-    """ Main application """
-    cups_hat.display_startup()
-
-    while True:
-        # Call each task
-        cups_hat.task_check_inputs()
-        cups_hat.task_oled_prepare_framebuffer()
-        cups_hat.task_oled_update()
-        cups_hat.task_tick_updater()
-        cups_hat.task_led_status()
-
-
-
-if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\nEnding test....")
-        cups_hat.display_shutdown()
-    except SystemExit:
-        #TODO: Replace or remove this SystemExit processing later.
-        #NOTE: SystemExit is the exception result of calling exit()
-        print("Byeee")
-        cups_hat.display_shutdown()
+   
