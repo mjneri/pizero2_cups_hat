@@ -37,7 +37,7 @@ tick_rate_heartbeat = 0.25         # Blink LED every 250ms
 flag_kill_threads = False
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# Function Defines
+# Application tasks
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 # TODO: Complete this function
@@ -45,6 +45,7 @@ def app_cleanup():
     """
     Function is called before shutting down or exiting the app
     """
+# END OF def app_cleanup()
 
 # TODO: Define all task methods with "task_" before the name
 # Refer to Task State Diagram in OneNote
@@ -53,6 +54,7 @@ def task_oled_update(cups_hat: CUPS_Hat):
     if flag_tick_oled_update is True:
         flag_tick_oled_update = False
         cups_hat.oled_update()
+# END OF def task_oled_update()
 
 def task_oled_prepare_framebuffer(cups_hat: CUPS_Hat):
     """
@@ -61,23 +63,34 @@ def task_oled_prepare_framebuffer(cups_hat: CUPS_Hat):
     """
     hat = cups_hat
 
-    # Empty the framebuffers first.
+    # TODO: Clean up the code here because it will get messy once I add logic for processing different menus.
+    # Step 1: Empty the framebuffers first.
     hat.framebuffer_clear()
 
-    # Prepare contents of the text box first.
+    # Step 2: Prepare contents of the text box.
     # TODO: Display different text depending on whether is_command_executed returned true.
     # Ex: if user selects Print Test Page, it should display "Printing test page..." for a few seconds...
-    hat.text_draw_handle.text(hat.POS_OLED_TEXT_BOX_LINE1, hat.menu_item_names_list[hat.current_menu], font=hat.img_font, fill=255, spacing=-2)
+    if hat.current_menu in range(hat.MENU_SUB_SYSINFO_P1, hat.MENU_SUB_SYSINFO_P2 + 1):
+        # TODO: Consider running commands for the Sys Info sub menu to periodically get temperatures, mem info, etc.
+        # TODO: Consider creating a new text box for sub menus...
+        # TODO: Use ImageFont.load_default() for the Sys Info sub-menu to use smaller text.
+        hat.img_draw_handle.text((10, 1), "This is temporary\nText.", font=hat.img_font, fill=255, spacing=-2)
+    else:
+        hat.text_draw_handle.text(hat.POS_OLED_TEXT_BOX_LINE1, hat.menu_item_names_list[hat.current_menu], font=hat.img_font, fill=255, spacing=-2)
 
-    # Prepare the Icon
-    if hat.is_button_pressed(hat.btn_enter) == True:
-        hat.img_framebuffer.paste(hat.invert_asset_list[hat.current_menu], hat.POS_OLED_ICON)
-    else:    
-        hat.img_framebuffer.paste(hat.asset_list[hat.current_menu], hat.POS_OLED_ICON)
+    # Step 3: Prepare the icon
+    if hat.current_menu in range(hat.MENU_MAIN_REBOOT, hat.MENU_MAIN_SYS_INFO + 1):
+        if hat.is_button_pressed(hat.btn_enter) == True:
+            hat.img_framebuffer.paste(hat.invert_asset_list[hat.current_menu], hat.POS_OLED_ICON)
+        else:    
+            hat.img_framebuffer.paste(hat.asset_list[hat.current_menu], hat.POS_OLED_ICON)
 
-    # Paste text box to the main frame buffer.
-    hat.img_framebuffer.paste(hat.text_framebuffer, hat.POS_OLED_TEXT_BOX)
+    # Step 4: Paste text box to the main frame buffer.
+    if hat.current_menu in range(hat.MENU_MAIN_REBOOT, hat.MENU_MAIN_SYS_INFO + 1):
+        hat.img_framebuffer.paste(hat.text_framebuffer, hat.POS_OLED_TEXT_BOX)
 
+    # Step 5: Invert left/right icons depending on the menu.
+    # TODO: Display only right icon for MENU_SUB_SYSINFO_P1, and left icon only for MENU_SUB_SYSINFO_P2.
     if hat.is_button_pressed(hat.btn_left) == True:
         hat.img_framebuffer.paste(hat.invert_navi_asset_list[hat.ASSET_NAVI_LEFT], hat.POS_OLED_NAVI_LEFT)
     else:
@@ -87,6 +100,7 @@ def task_oled_prepare_framebuffer(cups_hat: CUPS_Hat):
         hat.img_framebuffer.paste(hat.invert_navi_asset_list[hat.ASSET_NAVI_RIGHT], hat.POS_OLED_NAVI_RIGHT)
     else:
         hat.img_framebuffer.paste(hat.navi_asset_list[hat.ASSET_NAVI_RIGHT], hat.POS_OLED_NAVI_RIGHT)
+# END OF def task_oled_prepare_framebuffer()
 
 def task_check_inputs(cups_hat: CUPS_Hat):
     """
@@ -95,30 +109,64 @@ def task_check_inputs(cups_hat: CUPS_Hat):
     btn_left = cups_hat.btn_left
     btn_right = cups_hat.btn_right
     btn_enter = cups_hat.btn_enter
+    cur_menu = cups_hat.current_menu
 
     # Check LEFT button
     if cups_hat.is_button_ev_det(btn_left):
-        if cups_hat.current_menu == cups_hat.ASSET_ICON_REBOOT:
-            cups_hat.current_menu = cups_hat.ASSET_ICON_INFO
-        else:
-            cups_hat.current_menu = cups_hat.current_menu - 1
+        match cur_menu:
+            # Cycle through main menu only if the current_menu value is within the MENU_MAIN_... range.
+            case cur_menu if cur_menu in range(cups_hat.MENU_MAIN_REBOOT, cups_hat.MENU_MAIN_SYS_INFO + 1):
+                if cur_menu == cups_hat.MENU_MAIN_REBOOT:
+                    cur_menu = cups_hat.MENU_MAIN_SYS_INFO
+                else:
+                    cur_menu = cur_menu - 1
+            
+            # Cycle through System Info sub menu
+            case cur_menu if cur_menu in range(cups_hat.MENU_SUB_SYSINFO_P1, cups_hat.MENU_SUB_SYSINFO_P2 + 1):
+                if cur_menu == cups_hat.MENU_SUB_SYSINFO_P2:
+                    cur_menu = cups_hat.MENU_SUB_SYSINFO_P1
+                else:
+                    pass
     else:
         pass
 
     # Check RIGHT button
     if cups_hat.is_button_ev_det(btn_right):
-        if cups_hat.current_menu == cups_hat.ASSET_ICON_INFO:
-            cups_hat.current_menu = cups_hat.ASSET_ICON_REBOOT
-        else:
-            cups_hat.current_menu = cups_hat.current_menu + 1
+        match cur_menu:
+            # Cycle through main menu only if the current_menu value is within the MENU_MAIN_... range.
+            case cur_menu if cur_menu in range(cups_hat.MENU_MAIN_REBOOT, cups_hat.MENU_MAIN_SYS_INFO + 1):
+                if cur_menu == cups_hat.MENU_MAIN_SYS_INFO:
+                    cur_menu = cups_hat.MENU_MAIN_REBOOT
+                else:
+                    cur_menu = cur_menu + 1
+            
+            # Cycle through System Info sub menu
+            case cur_menu if cur_menu in range(cups_hat.MENU_SUB_SYSINFO_P1, cups_hat.MENU_SUB_SYSINFO_P2 + 1):
+                if cur_menu == cups_hat.MENU_SUB_SYSINFO_P1:
+                    cur_menu = cups_hat.MENU_SUB_SYSINFO_P2
+                else:
+                    pass
     else:
         pass
 
     # Check ENTER button
     if cups_hat.is_button_ev_det(btn_enter):
-        cups_hat.run_command()
+        match cur_menu:
+            case cups_hat.MENU_MAIN_SYS_INFO:
+                cur_menu = cups_hat.MENU_SUB_SYSINFO_P1
+
+            case cur_menu if cur_menu in range(cups_hat.MENU_SUB_SYSINFO_P1, cups_hat.MENU_SUB_SYSINFO_P2 + 1):
+                cur_menu = cups_hat.MENU_MAIN_SYS_INFO
+
+        # TODO: Figure out when to execute commands... on button press, or periodically (i.e., for System Info)?
+        if cur_menu in range(cups_hat.MENU_MAIN_REBOOT, cups_hat.MENU_MAIN_SYS_INFO + 1):
+                cups_hat.run_command()
     else:
         pass
+
+    # Copy cur_menu value back to cups_hat.current_menu
+    cups_hat.current_menu = cur_menu
+# END OF def task_check_inputs()
 
 def task_led_status(cups_hat: CUPS_Hat):
     """
@@ -128,8 +176,12 @@ def task_led_status(cups_hat: CUPS_Hat):
     if flag_tick_heartbeat is True:
         flag_tick_heartbeat = False
         cups_hat.heartbeat()
+# END OF def task_led_status()
 
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Thread functions
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 def thread_oled_timer(tick_rate):
     global flag_tick_oled_update
     while not flag_kill_threads:
@@ -161,7 +213,7 @@ if __name__ == '__main__':
         thread_2.start()
 
         cups_hat.display_startup()
-        print("Starting display...")
+        print("Test 2024-05-19 3.37pm: Starting display...")
 
         while True:
             # Call each task

@@ -166,3 +166,4 @@ cython_debug/
 
 # Specific files
 src/ssd1306_stats.py
+.vscode/launch.json

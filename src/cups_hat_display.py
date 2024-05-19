@@ -63,9 +63,17 @@ class CUPS_Hat:
     ASSET_ICON_POWER         = 2
     ASSET_ICON_PRINTER_INFO  = 3
     ASSET_ICON_INFO          = 4
+    ASSET_NAVI_RIGHT         = 0
+    ASSET_NAVI_LEFT          = 1
 
-    ASSET_NAVI_RIGHT        = 0
-    ASSET_NAVI_LEFT         = 1
+    # Define menu index constants, for use with current_menu.
+    MENU_MAIN_REBOOT        = 0
+    MENU_MAIN_PRINT_TEST    = 1
+    MENU_MAIN_SHUTDOWN      = 2
+    MENU_MAIN_PRINTER_INFO  = 3
+    MENU_MAIN_SYS_INFO      = 4
+    MENU_SUB_SYSINFO_P1     = 5
+    MENU_SUB_SYSINFO_P2     = 6
 
     def __init__(self):
         """
@@ -73,11 +81,11 @@ class CUPS_Hat:
         """
         #TODO: Initialize some of the attributes below straight from shell commands instead of 0 at first.
         self.is_idle = False        # Bool that indicates whether the system is idle
-        self.current_menu = self.ASSET_ICON_PRINTER_INFO     # Default menu at startup.
+        self.current_menu = self.MENU_MAIN_PRINTER_INFO     # Default menu at startup.
         self.printer_status = 0     # 0 is ok, -1 not ok.
         self.sys_ip_address = 0
         self.sys_temperature = 0
-        self.is_startup = True      # TODO: FIND OUT WTF THIS IS.
+        self.is_startup = True      # TODO: Figure out what to do with this.
         self.is_command = False     # Sticky bit that indicates whether a command was executed.
 
         """ Raspberry Pi GPIOs """
@@ -292,24 +300,24 @@ class CUPS_Hat:
         Run a command based on the current menu.
         """
         match self.current_menu:
-            case self.ASSET_ICON_REBOOT:
+            case self.MENU_MAIN_REBOOT:
                 #os("reboot")
                 print("REBOOT!")
                 os.system("vcgencmd measure_temp")
-            case self.ASSET_ICON_PRINTER:
+            case self.MENU_MAIN_PRINT_TEST:
                 # Print Test page...
                 #os("lp -d WiFi_HP_Ink_Tank_115 /usr/share/cups/data/testprint")
                 print("TEST PRINT")
-            case self.ASSET_ICON_POWER:
+            case self.MENU_MAIN_SHUTDOWN:
                 # Shutdown...
                 #os("poweroff")
                 print("POWEROFF!")
                 exit()
-            case self.ASSET_ICON_PRINTER_INFO:
+            case self.MENU_MAIN_PRINTER_INFO:
                 # Get printer info using shell commands...
                 print("PRINTER INFO!")
                 pass
-            case self.ASSET_ICON_INFO:
+            case self.MENU_MAIN_SYS_INFO:
                 # Get other info (ip address, temp etc)
                 print("SYSTEM INFO!")
                 pass
