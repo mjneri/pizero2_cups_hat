@@ -315,6 +315,7 @@ class CUPS_Hat:
         """
         Run a command based on the current menu.
         """
+        # TODO: Determine whether these commands should also be ran in the sub-menus, or if this function should be reworked to run specific sets of commands that ARE NOT dependent on the current_menu value.
         match self.current_menu:
             case self.MENU_MAIN_REBOOT:
                 #os("reboot")
@@ -332,15 +333,17 @@ class CUPS_Hat:
                 # Get printer info using shell commands...
                 print("PRINTER INFO!")
                 pass
-            case self.current_menu if self.current_menu in (self.MENU_MAIN_SYS_INFO, self.MENU_SUB_SYSINFO_P1, self.MENU_SUB_SYSINFO_P2):
-                # TODO: Determine whether these commands should also be ran in the sub-menus, or if this function should be reworked to run specific sets of commands that ARE NOT dependent on the current_menu value.
-                # TODO: Update sys_uptime and add ability to get uptime in Days as well. Right now it can only get hours and minutes from the "uptime" command.
-                self.sys_ip_address = subprocess.check_output("hostname -I | cut -d' ' -f1", shell=True).decode("utf-8")
-                self.sys_temperature = subprocess.check_output("vcgencmd measure_temp | awk \'{split($0,a,\"=\"); print a[2]}\'", shell=True).decode("utf-8")
-                self.sys_uptime = subprocess.check_output("uptime | awk \'NR==1{printf \"%s\", $3}\' | awk \'{split($0,a,\":\"); print a[1], a[2]}\' | awk \'{split($0,a,\",\"); print a[1]}\' | awk \'{split($0,a,\" \"); printf \"%sh %sm\", a[1], a[2]}\'", shell=True).decode("utf-8")
-                self.sys_memusage = subprocess.check_output("free -m | awk 'NR==2{printf \"Mem: %s/%s MB\", $3,$2 }'", shell=True).decode("utf-8")
-                self.sys_cpuload = subprocess.check_output('cut -f 1 -d " " /proc/loadavg', shell=True).decode("utf-8")
+            case self.MENU_MAIN_SYS_INFO:
+                print("SYSTEM INFO")
                 pass
+
+    def run_sys_info_commands(self):
+        # TODO: Update sys_uptime and add ability to get uptime in Days as well. Right now it can only get hours and minutes from the "uptime" command.
+        self.sys_ip_address = subprocess.check_output("hostname -I | cut -d' ' -f1", shell=True).decode("utf-8")
+        self.sys_temperature = subprocess.check_output("vcgencmd measure_temp | awk \'{split($0,a,\"=\"); print a[2]}\'", shell=True).decode("utf-8")
+        self.sys_uptime = subprocess.check_output("uptime | awk \'NR==1{printf \"%s\", $3}\' | awk \'{split($0,a,\":\"); print a[1], a[2]}\' | awk \'{split($0,a,\",\"); print a[1]}\' | awk \'{split($0,a,\" \"); printf \"%sh %sm\", a[1], a[2]}\'", shell=True).decode("utf-8")
+        self.sys_memusage = subprocess.check_output("free -m | awk 'NR==2{printf \"Mem: %s/%s MB\", $3,$2 }'", shell=True).decode("utf-8")
+        self.sys_cpuload = subprocess.check_output('cut -f 1 -d " " /proc/loadavg', shell=True).decode("utf-8")
 
     def framebuffer_clear(self):
         """
@@ -419,8 +422,7 @@ class CUPS_Hat:
         match self.current_menu:
             case self.current_menu if self.current_menu in range(self.MENU_SUB_SYSINFO_P1, self.MENU_SUB_SYSINFO_P2 + 1):
                 temp_str = 0
-                # TODO: Determine whether run_command should even be called here!
-                self.run_command()
+                self.run_sys_info_commands()
                 if self.current_menu == self.MENU_SUB_SYSINFO_P1:
                     temp_str = f"IP: {self.sys_ip_address}\nCPU Load: {self.sys_cpuload}\n{self.sys_memusage}"
                 else:
