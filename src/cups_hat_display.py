@@ -47,15 +47,21 @@ class CUPS_Hat:
     OLED_TEXT_BOX_WIDTH = 80
     OLED_TEXT_BOX_HEIGHT = 26
 
+    OLED_SUBMENU_TEXT_BOX_WIDTH = 108
+    OLED_SUBMENU_TEXT_BOX_HEIGHT = 26
+
     # Define X-Y COORDS Constants
     # TODO: FINISH THESE DEFINES
     POS_OLED_ICON = (14, 8)         # for the icon
     POS_OLED_NAVI_LEFT = (1, 12)
     POS_OLED_NAVI_RIGHT = (119, 12)
     POS_OLED_TEXT_BOX = (36, 5)
+    POS_OLED_SUBMENU_TEXT_BOX = (10, 3)
 
     POS_OLED_TEXT_BOX_LINE1 = (3, -2)
     POS_OLED_TEXT_BOX_LINE2 = (3, 9)
+
+    POS_OLED_SUBMENU_TEXT_BOX_LINE1 = (0, -2)
 
     # Define asset index constants
     ASSET_ICON_REBOOT        = 0
@@ -82,11 +88,16 @@ class CUPS_Hat:
         #TODO: Initialize some of the attributes below straight from shell commands instead of 0 at first.
         self.is_idle = False        # Bool that indicates whether the system is idle
         self.current_menu = self.MENU_MAIN_PRINTER_INFO     # Default menu at startup.
+        self.is_startup = True      # TODO: Figure out what to do with this.
+        self.is_command = False     # Sticky bit that indicates whether a command was executed.
+
+        # System info
         self.printer_status = 0     # 0 is ok, -1 not ok.
         self.sys_ip_address = 0
         self.sys_temperature = 0
-        self.is_startup = True      # TODO: Figure out what to do with this.
-        self.is_command = False     # Sticky bit that indicates whether a command was executed.
+        self.sys_uptime = 0
+        self.sys_memusage = 0
+        self.sys_cpuload = 0
 
         """ Raspberry Pi GPIOs """
         self.btn_left = 5       # GPIO5
@@ -153,11 +164,16 @@ class CUPS_Hat:
         # Create Framebuffer for the text box.
         self.text_framebuffer = Image.new("1", (self.OLED_TEXT_BOX_WIDTH, self.OLED_TEXT_BOX_HEIGHT))
         self.text_draw_handle = ImageDraw.Draw(self.text_framebuffer)
+
+        # Create Framebuffer for the sub-menu text box.
+        self.submenu_text_framebuffer = Image.new("1", (self.OLED_SUBMENU_TEXT_BOX_WIDTH, self.OLED_SUBMENU_TEXT_BOX_HEIGHT))
+        self.submenu_text_draw_handle = ImageDraw.Draw(self.submenu_text_framebuffer)
         """ ENDOF OLED Initialization """
         
         """ Asset attributes """
         # Load default font
         self.img_font = ImageFont.truetype("fonts/PixelOperator.ttf", size=16)
+        self.def_font = ImageFont.load_default()
 
         # Load all assets
         self.asset_list = [
@@ -303,7 +319,6 @@ class CUPS_Hat:
             case self.MENU_MAIN_REBOOT:
                 #os("reboot")
                 print("REBOOT!")
-                os.system("vcgencmd measure_temp")
             case self.MENU_MAIN_PRINT_TEST:
                 # Print Test page...
                 #os("lp -d WiFi_HP_Ink_Tank_115 /usr/share/cups/data/testprint")
@@ -317,9 +332,14 @@ class CUPS_Hat:
                 # Get printer info using shell commands...
                 print("PRINTER INFO!")
                 pass
-            case self.MENU_MAIN_SYS_INFO:
-                # Get other info (ip address, temp etc)
-                print("SYSTEM INFO!")
+            case self.current_menu if self.current_menu in (self.MENU_MAIN_SYS_INFO, self.MENU_SUB_SYSINFO_P1, self.MENU_SUB_SYSINFO_P2):
+                # TODO: Determine whether these commands should also be ran in the sub-menus, or if this function should be reworked to run specific sets of commands that ARE NOT dependent on the current_menu value.
+                # TODO: Update sys_uptime and add ability to get uptime in Days as well. Right now it can only get hours and minutes from the "uptime" command.
+                self.sys_ip_address = subprocess.check_output("hostname -I | cut -d' ' -f1", shell=True).decode("utf-8")
+                self.sys_temperature = subprocess.check_output("vcgencmd measure_temp | awk \'{split($0,a,\"=\"); print a[2]}\'", shell=True).decode("utf-8")
+                self.sys_uptime = subprocess.check_output("uptime | awk \'NR==1{printf \"%s\", $3}\' | awk \'{split($0,a,\":\"); print a[1], a[2]}\' | awk \'{split($0,a,\",\"); print a[1]}\' | awk \'{split($0,a,\" \"); printf \"%sh %sm\", a[1], a[2]}\'", shell=True).decode("utf-8")
+                self.sys_memusage = subprocess.check_output("free -m | awk 'NR==2{printf \"Mem: %s/%s MB\", $3,$2 }'", shell=True).decode("utf-8")
+                self.sys_cpuload = subprocess.check_output('cut -f 1 -d " " /proc/loadavg', shell=True).decode("utf-8")
                 pass
 
     def framebuffer_clear(self):
@@ -328,6 +348,7 @@ class CUPS_Hat:
         """
         self.img_draw_handle.rectangle((0, 0, self.OLED_WIDTH, self.OLED_HEIGHT), outline=0, fill=0)
         self.text_draw_handle.rectangle((0, 0, self.OLED_TEXT_BOX_WIDTH, self.OLED_TEXT_BOX_HEIGHT), outline=0, fill=0)
+        self.submenu_text_draw_handle.rectangle((0, 0, self.OLED_SUBMENU_TEXT_BOX_WIDTH, self.OLED_SUBMENU_TEXT_BOX_HEIGHT), outline=0, fill=0)
 
     def heartbeat(self):
         """
@@ -336,6 +357,101 @@ class CUPS_Hat:
         io.output(self.led_green, self.led_state)
         self.led_state = self.led_state ^ 1
 
-    
+    #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    # current_menu-related class methods
+    #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    def menu_change_left(self):
+        """
+        Advance the current_menu value to the left
+        """
+        match self.current_menu:
+            case self.current_menu if self.current_menu in range(self.MENU_MAIN_REBOOT, self.MENU_MAIN_SYS_INFO + 1):
+                # Cycle through main menu only if the current_menu value is within the MENU_MAIN_... range.
+                if self.current_menu == self.MENU_MAIN_REBOOT:
+                    self.current_menu = self.MENU_MAIN_SYS_INFO
+                else:
+                    self.current_menu = self.current_menu - 1
+            
+            case self.current_menu if self.current_menu in range(self.MENU_SUB_SYSINFO_P1, self.MENU_SUB_SYSINFO_P2 + 1):
+                # Cycle through System Info sub menu
+                if self.current_menu == self.MENU_SUB_SYSINFO_P2:
+                    self.current_menu = self.MENU_SUB_SYSINFO_P1
+                else:
+                    pass
 
-   
+    def menu_change_right(self):
+        """
+        Advance the current_menu value to the right
+        """
+        match self.current_menu:
+            case self.current_menu if self.current_menu in range(self.MENU_MAIN_REBOOT, self.MENU_MAIN_SYS_INFO + 1):
+                # Cycle through main menu only if the current_menu value is within the MENU_MAIN_... range.
+                if self.current_menu == self.MENU_MAIN_SYS_INFO:
+                    self.current_menu = self.MENU_MAIN_REBOOT
+                else:
+                    self.current_menu = self.current_menu + 1
+
+            case self.current_menu if self.current_menu in range(self.MENU_SUB_SYSINFO_P1, self.MENU_SUB_SYSINFO_P2 + 1):
+                # Cycle through System Info sub menu
+                if self.current_menu == self.MENU_SUB_SYSINFO_P1:
+                    self.current_menu = self.MENU_SUB_SYSINFO_P2
+                else:
+                    pass
+
+    def menu_change_enter(self):
+        """
+        Enter/exit a sub-menu based on the current_menu value.
+        """
+        match self.current_menu:
+            case self.MENU_MAIN_SYS_INFO:
+                self.current_menu = self.MENU_SUB_SYSINFO_P1
+
+            case self.current_menu if self.current_menu in range(self.MENU_SUB_SYSINFO_P1, self.MENU_SUB_SYSINFO_P2 + 1):
+                self.current_menu = self.MENU_MAIN_SYS_INFO
+
+    def menu_prepare_framebuffer(self):
+        """
+        Prepare the menu for the framebuffer to be displayed based on the current_menu value
+        """
+        self.framebuffer_clear()
+
+        # Prepare text box and icon contents
+        match self.current_menu:
+            case self.current_menu if self.current_menu in range(self.MENU_SUB_SYSINFO_P1, self.MENU_SUB_SYSINFO_P2 + 1):
+                temp_str = 0
+                # TODO: Determine whether run_command should even be called here!
+                self.run_command()
+                if self.current_menu == self.MENU_SUB_SYSINFO_P1:
+                    temp_str = f"IP: {self.sys_ip_address}\nCPU Load: {self.sys_cpuload}\n{self.sys_memusage}"
+                else:
+                    temp_str = f"Temp: {self.sys_temperature}\nUptime: {self.sys_uptime}"
+                    
+                self.submenu_text_draw_handle.text(self.POS_OLED_SUBMENU_TEXT_BOX_LINE1, temp_str, font=self.def_font, fill=255, spacing=-5.5)
+
+            case self.current_menu if self.current_menu in range(self.MENU_MAIN_REBOOT, self.MENU_MAIN_SYS_INFO + 1):
+                self.text_draw_handle.text(self.POS_OLED_TEXT_BOX_LINE1, self.menu_item_names_list[self.current_menu], font=self.img_font, fill=255, spacing=-2)    
+
+                if self.is_button_pressed(self.btn_enter) == True:
+                    self.img_framebuffer.paste(self.invert_asset_list[self.current_menu], self.POS_OLED_ICON)
+                else:    
+                    self.img_framebuffer.paste(self.asset_list[self.current_menu], self.POS_OLED_ICON)
+
+        # Paste text box to the main frame buffer
+        if self.current_menu in range(self.MENU_MAIN_REBOOT, self.MENU_MAIN_SYS_INFO + 1):
+            self.img_framebuffer.paste(self.text_framebuffer, self.POS_OLED_TEXT_BOX)
+        elif self.current_menu in range(self.MENU_SUB_SYSINFO_P1, self.MENU_SUB_SYSINFO_P2 + 1):
+            self.img_framebuffer.paste(self.submenu_text_framebuffer, self.POS_OLED_SUBMENU_TEXT_BOX)
+
+        # Invert left/right icons depending on the menu
+        # TODO: Improve handling of the Sub-menus here.
+        if self.current_menu != self.MENU_SUB_SYSINFO_P1:
+            if self.is_button_pressed(self.btn_left) == True:
+                self.img_framebuffer.paste(self.invert_navi_asset_list[self.ASSET_NAVI_LEFT], self.POS_OLED_NAVI_LEFT)
+            else:
+                self.img_framebuffer.paste(self.navi_asset_list[self.ASSET_NAVI_LEFT], self.POS_OLED_NAVI_LEFT)
+
+        if self.current_menu != self.MENU_SUB_SYSINFO_P2:
+            if self.is_button_pressed(self.btn_right) == True:
+                self.img_framebuffer.paste(self.invert_navi_asset_list[self.ASSET_NAVI_RIGHT], self.POS_OLED_NAVI_RIGHT)
+            else:
+                self.img_framebuffer.paste(self.navi_asset_list[self.ASSET_NAVI_RIGHT], self.POS_OLED_NAVI_RIGHT)
