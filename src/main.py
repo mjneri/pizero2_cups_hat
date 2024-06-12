@@ -88,7 +88,7 @@ def task_check_inputs(cups_hat: CUPS_Hat):
     # Check ENTER button
     if cups_hat.is_button_ev_det(btn_enter):
         # TODO: Figure out when to execute commands... on button press, or periodically (i.e., for System Info)?
-        if cups_hat.current_menu in range(cups_hat.MENU_MAIN_REBOOT, cups_hat.MENU_MAIN_SYS_INFO + 1):
+        if cups_hat.current_menu in range(CUPS_Hat.MENU_MAIN_FIRST, CUPS_Hat.MENU_MAIN_LIMIT):
                 cups_hat.run_command()
 
         cups_hat.menu_change_enter()
